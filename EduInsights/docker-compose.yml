@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: eduinsight
+      POSTGRES_USER: eduinsight
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - eduinsight-network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -c "cd backend && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_DB: eduinsight
+      POSTGRES_USER: eduinsight
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      DEBUG: "1"
+    depends_on:
+      - db
+    networks:
+      - eduinsight-network
+
+volumes:
+  postgres_data:
+
+networks:
+  eduinsight-network:
+    driver: bridge

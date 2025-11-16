@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ student.full_name }} - Student Details{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Back Button -->
+    <a href="{% url 'student_list' %}" class="inline-flex items-center text-purple-600 hover:text-purple-800 font-medium">
+        <i class="fas fa-arrow-left mr-2"></i>Back to Students
+    </a>
+
+    <!-- Student Profile Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-lg p-8 text-white">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-6">
+                <div class="bg-white bg-opacity-20 rounded-full w-24 h-24 flex items-center justify-center text-5xl font-bold shadow-lg backdrop-blur">
+                    {{ student.full_name|slice:":1"|upper }}
+                </div>
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">{{ student.full_name }}</h1>
+                    <div class="flex items-center space-x-4 text-lg">
+                        <span><i class="fas fa-id-card mr-2"></i>{{ student.student_id }}</span>
+                        {% if student.age %}
+                        <span><i class="fas fa-birthday-cake mr-2"></i>{{ student.age }} years</span>
+                        {% endif %}
+                        {% if student.gender %}
+                        <span><i class="fas fa-user mr-2"></i>{{ student.gender }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="text-right">
+                <a href="/admin/students/student/{{ student.id }}/change/" 
+                   class="bg-white text-purple-600 hover:bg-gray-100 font-medium py-2 px-6 rounded-lg transition shadow-md inline-block mb-2">
+                    <i class="fas fa-edit mr-2"></i>Edit Student
+                </a>
+                <br>
+                <a href="/admin/students/performancerecord/add/?student={{ student.id }}" 
+                   class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-lg transition shadow-md inline-block">
+                    <i class="fas fa-plus mr-2"></i>Add Record
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prediction Section -->
+    {% if has_records %}
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">
+                <i class="fas fa-brain text-purple-600 mr-2"></i>AI Prediction
+            </h2>
+            <button onclick="getPrediction()" id="predictBtn" 
+                    class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg transition shadow-md">
+                <i class="fas fa-magic mr-2"></i>Get Prediction
+            </button>
+        </div>
+
+        <!-- Prediction Results -->
+        <div id="predictionResults" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Prediction Status Card -->
+                <div id="predictionCard" class="rounded-lg p-6 text-center"></div>
+                
+                <!-- Probability Card -->
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Success Probability</h3>
+                    <canvas id="probabilityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Contributing Factors -->
+            <div class="bg-blue-50 rounded-lg p-6 mb-6">
+                <h3 class="font-bold text-gray-800 mb-4">
+                    <i class="fas fa-chart-line mr-2"></i>Top Contributing Factors
+                </h3>
+                <div id="topFactors" class="space-y-3"></div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="bg-green-50 rounded-lg p-6">
+                <h3 class="font-bold text-gray-800 mb-4">
+                    <i class="fas fa-lightbulb mr-2"></i>Personalized Recommendations
+                </h3>
+                <div id="recommendations" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden text-center py-8">
+            <i class="fas fa-spinner fa-spin text-purple-600 text-4xl mb-4"></i>
+            <p class="text-gray-600">Analyzing student data...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 text-red-800"></div>
+    </div>
+    {% else %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+        <i class="fas fa-exclamation-triangle text-yellow-600 text-4xl mb-4"></i>
+        <h3 class="text-xl font-bold text-yellow-800 mb-2">No Performance Data Available</h3>
+        <p class="text-yellow-700 mb-4">Add performance records to enable AI predictions.</p>
+        <a href="/admin/students/performancerecord/add/?student={{ student.id }}" 
+           class="inline-block bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-6 rounded-lg transition">
+            <i class="fas fa-plus mr-2"></i>Add Performance Record
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Performance History -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+            <i class="fas fa-history text-blue-600 mr-2"></i>Performance History
+        </h2>
+
+        {% if records %}
+        <div class="space-y-4">
+            {% for record in records %}
+            <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">{{ record.term }}</h3>
+                        <p class="text-sm text-gray-500">
+                            <i class="fas fa-calendar mr-1"></i>Added {{ record.created_at|date:"F d, Y" }}
+                        </p>
+                    </div>
+                    {% if record.passed is not None %}
+                        {% if record.passed %}
+                        <span class="bg-green-100 text-green-800 text-sm font-semibold px-4 py-2 rounded-full">
+                            <i class="fas fa-check-circle mr-1"></i>Passed
+                        </span>
+                        {% else %}
+                        <span class="bg-red-100 text-red-800 text-sm font-semibold px-4 py-2 rounded-full">
+                            <i class="fas fa-times-circle mr-1"></i>Failed
+                        </span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">Attendance</p>
+                        <div class="relative pt-1">
+                            <div class="flex mb-2 items-center justify-between">
+                                <div class="text-lg font-semibold {% if record.attendance_rate < 75 %}text-red-600{% else %}text-green-600{% endif %}">
+                                    {{ record.attendance_rate }}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">Assignments</p>
+                        <div class="text-lg font-semibold {% if record.avg_assignment_score < 60 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ record.avg_assignment_score }}%
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">Midterm</p>
+                        <div class="text-lg font-semibold {% if record.midterm_score < 50 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ record.midterm_score }}%
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">Missing</p>
+                        <div class="text-lg font-semibold {% if record.missing_assignments > 2 %}text-red-600{% else %}text-gray-800{% endif %}">
+                            {{ record.missing_assignments }}
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">Participation</p>
+                        <div class="text-lg font-semibold text-gray-800">
+                            {{ record.participation }}%
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-1">LMS Hours</p>
+                        <div class="text-lg font-semibold {% if record.lms_hours < 2 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ record.lms_hours }}h
+                        </div>
+                    </div>
+                </div>
+
+                {% if record.final_grade %}
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <p class="text-sm text-gray-600">
+                        Final Grade: <span class="font-semibold text-gray-800">{{ record.final_grade }}%</span>
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-chart-line text-gray-300 text-6xl mb-4"></i>
+            <p class="text-gray-600 text-lg mb-4">No performance records yet</p>
+            <a href="/admin/students/performancerecord/add/?student={{ student.id }}" 
+               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition">
+                <i class="fas fa-plus mr-2"></i>Add First Record
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let probabilityChart = null;
+
+async function getPrediction() {
+    const resultsDiv = document.getElementById('predictionResults');
+    const loadingDiv = document.getElementById('loadingSpinner');
+    const errorDiv = document.getElementById('errorMessage');
+    const predictBtn = document.getElementById('predictBtn');
+
+    // Hide previous results and show loading
+    resultsDiv.classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    loadingDiv.classList.remove('hidden');
+    predictBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/students/{{ student.id }}/predict/');
+        const data = await response.json();
+
+        if (response.ok) {
+            displayPrediction(data);
+            resultsDiv.classList.remove('hidden');
+        } else {
+            throw new Error(data.error || 'Failed to get prediction');
+        }
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.classList.remove('hidden');
+    } finally {
+        loadingDiv.classList.add('hidden');
+        predictBtn.disabled = false;
+    }
+}
+
+function displayPrediction(data) {
+    // Prediction Status Card
+    const predictionCard = document.getElementById('predictionCard');
+    const isAtRisk = data.prediction === '0';
+    
+    predictionCard.className = isAtRisk 
+        ? 'rounded-lg p-6 text-center bg-red-50 border-2 border-red-200'
+        : 'rounded-lg p-6 text-center bg-green-50 border-2 border-green-200';
+    
+    predictionCard.innerHTML = `
+        <i class="fas ${isAtRisk ? 'fa-exclamation-triangle text-red-600' : 'fa-check-circle text-green-600'} text-5xl mb-4"></i>
+        <h3 class="text-2xl font-bold ${isAtRisk ? 'text-red-800' : 'text-green-800'} mb-2">
+            ${isAtRisk ? 'At Risk' : 'Likely to Pass'}
+        </h3>
+        <p class="${isAtRisk ? 'text-red-700' : 'text-green-700'}">
+            ${isAtRisk ? 'This student needs attention and support' : 'Student is on track for success'}
+        </p>
+    `;
+
+    // Probability Chart
+    const ctx = document.getElementById('probabilityChart').getContext('2d');
+    if (probabilityChart) {
+        probabilityChart.destroy();
+    }
+    
+    probabilityChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Fail', 'Pass'],
+            datasets: [{
+                data: data.probabilities,
+                backgroundColor: ['#ef4444', '#10b981'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Top Factors
+    const factorsDiv = document.getElementById('topFactors');
+    factorsDiv.innerHTML = data.top_features.map(([feature, importance]) => `
+        <div class="flex items-center">
+            <div class="flex-1">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-medium text-gray-700">${formatFeatureName(feature)}</span>
+                    <span class="text-sm font-semibold text-gray-800">${(importance * 100).toFixed(1)}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${importance * 100}%"></div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    // Recommendations
+    const recsDiv = document.getElementById('recommendations');
+    recsDiv.innerHTML = data.recommendations.map((rec, index) => `
+        <div class="flex items-start space-x-3 bg-white p-4 rounded-lg shadow-sm">
+            <div class="bg-green-100 rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
+                <span class="text-green-600 font-bold">${index + 1}</span>
+            </div>
+            <p class="text-gray-700 flex-1">${rec}</p>
+        </div>
+    `).join('');
+}
+
+function formatFeatureName(feature) {
+    const names = {
+        'attendance_rate': 'Attendance Rate',
+        'avg_assignment_score': 'Assignment Score',
+        'midterm_score': 'Midterm Score',
+        'missing_assignments': 'Missing Assignments',
+        'participation': 'Participation',
+        'lms_hours': 'LMS Engagement'
+    };
+    return names[feature] || feature;
+}
+</script>
+{% endblock %}
